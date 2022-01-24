@@ -47,6 +47,7 @@ void loop() {
 void calibrateRobot() {
 
   sensors.initFiveSensors();
+  proxSensors.initFrontSensor();
     // Wait 1 second and then begin automatic sensor calibration
   // by rotating in place to sweep the sensors over the line
   delay(1000);
@@ -164,6 +165,13 @@ void searchRoom() {
       motors.setSpeeds(CALIBERATE_SPEED, -CALIBERATE_SPEED);
       proxSensors.read();
     }
-  
   }
+  motors.setSpeeds(STOP_SPEED, STOP_SPEED);
+  if(proxSensors.countsLeftWithLeftLeds() > 0 || proxSensors.countsFrontWithLeftLeds() > 0 || proxSensors.countsFrontWithRightLeds() > 0 || proxSensors.countsRightWithRightLeds() > 0) {
+    Serial1.println("Person found!");
+  }
+  else {
+    Serial1.println("No Person found");
+  }
+  Serial1.println("If action is complete, press C to continue");
 }
