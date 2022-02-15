@@ -10,11 +10,10 @@ Zumo32U4Buzzer buzzer;
 Zumo32U4ProximitySensors proxSensors;
 
 //Speed Declarations
-#define REVERSE_SPEED     50
 #define TURN_SPEED        150
 #define CALIBERATE_SPEED  200
 #define BACKWARD_SPEED    150
-#define FORWARD_SPEED     140
+#define FORWARD_SPEED     200
 #define STOP_SPEED        0                             // Setting engine speed to zero
 
 //Storage and declarations for line sensor used within course
@@ -47,6 +46,8 @@ void loop() {
       break;
     case 1:
       autonomous();
+    case 2:
+      reachedImpass();
   }
 }
 
@@ -172,7 +173,7 @@ void manualControl() {
       motors.setSpeeds(-BACKWARD_SPEED, -BACKWARD_SPEED);
       delay(200);
       motors.setSpeeds(TURN_SPEED, -TURN_SPEED);
-      delay(1000);
+      delay(2000);
       motors.setSpeeds(STOP_SPEED, STOP_SPEED);
     }
     else if (endCounter == 2) {
@@ -235,7 +236,7 @@ void autonomous() {
     //if left and right sensor get a black border reading then...
     else if(((lineSensorValues[2] > QTR_THRESHOLD) && (lineSensorValues[0] > QTR_THRESHOLD)) || (lineSensorValues[1] > QTR_THRESHOLD)){ //if center sensor detects black line |sensor 1
       //reached impass function
-      reachedImpass();
+      robotStatus = 2;
       //delay half a second
       delay(500);
       motors.setSpeeds(0,0);
@@ -275,12 +276,12 @@ void searchRoom() {
   {
     if (i > 30 && i <= 90)
     {
-      motors.setSpeeds(-CALIBERATE_SPEED, CALIBERATE_SPEED);
+      motors.setSpeeds(-TURN_SPEED, TURN_SPEED);
       proxSensors.read();
     }
     else
     {
-      motors.setSpeeds(CALIBERATE_SPEED, -CALIBERATE_SPEED);
+      motors.setSpeeds(TURN_SPEED, -TURN_SPEED);
       proxSensors.read();
     }
   }
@@ -297,9 +298,9 @@ void searchRoom() {
 
   Serial1.println("If action is complete, press C to continue");
   while (incomingByte != 'c')
-      {
-        incomingByte = (char) Serial1.read();
-      }
+  {
+    incomingByte = (char) Serial1.read();
+  }
 }
 
 //when zumo reaches an impass
@@ -311,17 +312,72 @@ void reachedImpass(){
   delay(500);
   motors.setSpeeds(0, 0);
   delay(250);
-  Serial1.println("Reached Corner");
-  robotStatus = 0;
+  Serial1.println("Reached Impass");
   Serial1.println("Press Y for corner, T for T-Junction or L for end of hallway");
   switch (incomingByte)
   {
   case 'y':
-    /* code */
+    Serial1.println("Press A to turn left or D to turn right");
+    while ((incomingByte != 'a') && (incomingByte != 'd'))
+      {
+        incomingByte = (char) Serial1.read();
+      }
+
+      if (incomingByte == 'a')
+      {
+        motors.setSpeeds(-TURN_SPEED, TURN_SPEED);
+        delay(500);
+        motors.setSpeeds(STOP_SPEED, STOP_SPEED);
+        robotStatus = 1;
+      }
+
+      else
+      {
+        motors.setSpeeds(TURN_SPEED, -TURN_SPEED);
+        delay(500);
+        motors.setSpeeds(STOP_SPEED, STOP_SPEED);
+        robotStatus = 1;
+      }
     break;
   case 't':
+    Serial1.println("T Junction reached, pressed A to turn left or D to turn right");
+    while ((incomingByte != 'a') && (incomingByte != 'd'))
+      {
+        incomingByte = (char) Serial1.read();
+      }
+
+      if (incomingByte == 'a')
+      {
+        motors.setSpeeds(-TURN_SPEED, TURN_SPEED);
+        delay(500);
+        motors.setSpeeds(STOP_SPEED, STOP_SPEED);
+        robotStatus = 1;
+      }
+
+      else
+      {
+        motors.setSpeeds(TURN_SPEED, -TURN_SPEED);
+        delay(500);
+        motors.setSpeeds(STOP_SPEED, STOP_SPEED);
+        robotStatus = 1;
+      }
     break;
   case 'l':
+    motors.setSpeeds(STOP_SPEED, STOP_SPEED);
+    endCounter++;
+    if(endCounter == 1) {
+      Serial1.println("Reached end " + endCounter);
+      Serial1.print(" turning around");
+      motors.setSpeeds(-BACKWARD_SPEED, -BACKWARD_SPEED);
+      delay(200);
+      motors.setSpeeds(TURN_SPEED, -TURN_SPEED);
+      delay(2000);
+      motors.setSpeeds(STOP_SPEED, STOP_SPEED);
+    }
+    else if (endCounter == 2) {
+      Serial1.println("Reached end " + endCounter);
+      Serial1.print(" end of corridor");
+    }
     break;
   }
 
