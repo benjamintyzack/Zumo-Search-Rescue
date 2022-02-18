@@ -23,7 +23,7 @@ Zumo32U4Encoders encoders;
 unsigned int lineSensorValues[NUM_SENSORS]; //array for line sensor values
 
 int roomNumber = 0;
-int endCounter = 0;
+int endCounter;
 int calibrateData[3];
 int encodersCountLeft;
 int encodersCountRight;
@@ -94,7 +94,7 @@ void manualControl() {
   if(incomingByte == 'w') {
     Serial1.println("Moving Forward");
     motors.setSpeeds(FORWARD_SPEED, FORWARD_SPEED);
-    delay(250);
+    delay(300);
     motors.setSpeeds(STOP_SPEED, STOP_SPEED);
   }
   else if(incomingByte == 's') {
@@ -106,13 +106,13 @@ void manualControl() {
   else if(incomingByte == 'a') {
     Serial1.println("Turning Left");
     motors.setSpeeds(-TURN_SPEED, TURN_SPEED);
-    delay(250);
+    delay(150);
     motors.setSpeeds(STOP_SPEED, STOP_SPEED);
   }
   else if(incomingByte == 'd') {
     Serial1.println("Turning Right");
     motors.setSpeeds(TURN_SPEED, -TURN_SPEED);
-    delay(250);
+    delay(150);
     motors.setSpeeds(STOP_SPEED, STOP_SPEED);
   }
   else if(incomingByte == 'q') {
@@ -124,36 +124,7 @@ void manualControl() {
     motors.setSpeeds(STOP_SPEED, STOP_SPEED);
   }
   else if(incomingByte == 'b') {
-    
-    Serial1.println("Stopping for Room");
-    Serial1.println("Indicate which direction the room is, press A for left or D for right");
-    motors.setSpeeds(STOP_SPEED, STOP_SPEED);
-    
-    while ((incomingByte != 'a') && (incomingByte != 'd'))
-    {
-      incomingByte = (char) Serial1.read();
-    }
-
-    // Save the room number and the side of it if user presses a is left but in other situations is right
-    if (incomingByte == 'a')
-    {
-      turnLeft90();
-      motors.setSpeeds(STOP_SPEED, STOP_SPEED);
-      roomNumber++;
-      foundRooms[roomNumber] = "left";
-    }
-
-    else
-    {
-      turnRight90();
-      motors.setSpeeds(STOP_SPEED, STOP_SPEED);
-      roomNumber++;
-      foundRooms[roomNumber] = "right";
-    }
-    Serial1.print("Room ");
-    Serial1.print(roomNumber);
-    Serial1.print(" is on the ");
-    Serial1.print(foundRooms[roomNumber]);
+    logRoom();
     Serial1.println("Press C to search room");
 
     while (incomingByte != 'c')
@@ -165,28 +136,18 @@ void manualControl() {
       searchRoom();
     }
   }
-
   else if(incomingByte == 'k') {
     motors.setSpeeds(STOP_SPEED, STOP_SPEED);
     Serial1.println("EMERGENCY STOP!");
   }
 
-  else if (incomingByte == 'l') {
-
+  else if (incomingByte == 'u') {
     motors.setSpeeds(STOP_SPEED, STOP_SPEED);
-    endCounter++;
-    if(endCounter == 1) {
-      Serial1.println("Reached end " + endCounter);
-      Serial1.print(" turning around");
-      motors.setSpeeds(-BACKWARD_SPEED, -BACKWARD_SPEED);
-      turnLeft90();
-      turnLeft90();
-      motors.setSpeeds(STOP_SPEED, STOP_SPEED);
-    }
-    else if (endCounter == 2) {
-      Serial1.println("Reached end " + endCounter);
-      Serial1.print(" end of corridor");
-    }
+    Serial1.print("Turning around");
+    motors.setSpeeds(-BACKWARD_SPEED, -BACKWARD_SPEED);
+    turnLeft90();
+    turnLeft90();
+    motors.setSpeeds(STOP_SPEED, STOP_SPEED);
   }
 
   else if(incomingByte == 'm') {
@@ -204,10 +165,20 @@ void autonomous() {
     logRoom();
     searchRoom();
   }
+  else if (incomingByte == 'p') {
+    enableMessages = true;
+    Serial1.println("T Junctions passed, Room search enabled");
+  }
+  else if(incomingByte == 'k') {
+    motors.setSpeeds(STOP_SPEED, STOP_SPEED);
+    Serial1.println("EMERGENCY STOP!");
+    robotStatus = 0;
+    Serial1.println("Robot returned to manual mode");
+  }
   //if left and right sensor get a black border reading then...
-  else if(((lineSensorValues[2] > calibrateData[2] + 100) && (lineSensorValues[0] > calibrateData[0] + 100) || (lineSensorValues[1] > calibrateData[1]))){ //if center sensor detects black line |sensor 1
-    endCounter++;
+  else if(((lineSensorValues[2] > calibrateData[2] + 100) && (lineSensorValues[0] > calibrateData[0] + 100) || (lineSensorValues[1] > calibrateData[1] + 100))){ //if center sensor detects black line |sensor 1
     motors.setSpeeds(0,0);
+    endCounter++;
     junction();
   } 
   //if left sesnor gets a black reading...
@@ -218,16 +189,6 @@ void autonomous() {
   }else if(lineSensorValues[2] > calibrateData[2] + 100){ //if right sensor detects black line| sensor 2
     //go ;left for 1/4 second
     motors.setSpeeds(0,  TURN_SPEED);
-  }
-  else if (incomingByte == 'p') {
-    enableMessages = true;
-    Serial1.println("T Junctions passed, Room search enabled");
-  }
-  else if(incomingByte == 'k') {
-    motors.setSpeeds(STOP_SPEED, STOP_SPEED);
-    Serial1.println("EMERGENCY STOP!");
-    robotStatus = 0;
-    Serial1.println("Robot returned to manual mode");
   }
   else {
     motors.setSpeeds(FORWARD_SPEED, FORWARD_SPEED);
@@ -337,25 +298,43 @@ void logRoom() {
 void junction() {
   incomingByte = Serial1.read();
 
-  if (incomingByte == 'a') {
-      Serial1.println("Turning Left");
-      turnLeft90();
-      robotStatus = 1;
+  if(endCounter <= 2) {
+    Serial1.println("Press A to turn left or D to turn right");
+
+    while ((incomingByte != 'a') && (incomingByte != 'd'))
+    {
+      incomingByte = (char) Serial1.read();
     }
-    else if (incomingByte == 'd') {
-      Serial1.println("Turning Right");
+
+    if (incomingByte == 'a')
+    {
+      Serial1.println("Turning left");
+      turnLeft90();
+    }
+    else 
+    {
+      Serial1.println("Turning right");
       turnRight90();
-      robotStatus = 1;
     }
-    else if (incomingByte == 'u') {
-      turnLeft90();
-      turnLeft90();
-      if (endCounter == 3) {
-        enableMessages = false;
-      }
-      robotStatus = 1;
+    //Go back to auto mode
+    robotStatus = 1;
+  }
+  else if (endCounter == 3) {
+    Serial1.println("Press U to complete a 180 degree turn");
+    while ((incomingByte != 'u'))
+    {
+      incomingByte = (char) Serial1.read();
     }
-    else if (endCounter == 4) {
-      Serial1.println("End of hallway reached");
-    }
+    Serial.println("Starting 180 degree turn...");
+    turnLeft90();
+    turnLeft90();
+    robotStatus = 1;
+    // Ensure that the zumo can no longer search
+    enableMessages = false;
+  }
+  else if (endCounter == 4) {
+    Serial1.println("End of Hallway.");
+    robotStatus = 0;
+    endCounter = 0;
+  }
 }
