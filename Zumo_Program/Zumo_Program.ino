@@ -215,8 +215,8 @@ void searchRoom() {
   }
   motors.setSpeeds(STOP_SPEED, STOP_SPEED);
   if(proxSensors.countsLeftWithLeftLeds() > 3 || proxSensors.countsFrontWithLeftLeds() > 3 || proxSensors.countsFrontWithRightLeds() > 3 || proxSensors.countsRightWithRightLeds() > 3) {
-    Serial1.println(" ");
-    Serial1.println("Person found!");
+    Serial1.println("Person found in room ");
+    Serial1.println(roomDirection[roomNumber]);
     buzzer.play(">g32>>c32");
   }
   else {
@@ -293,6 +293,7 @@ void logRoom() {
   Serial1.print(roomNumber);
   Serial1.print(" is on the ");
   Serial1.print(foundRooms[roomNumber]);
+  Serial1.println(" ");
 }
 
 void junction() {
