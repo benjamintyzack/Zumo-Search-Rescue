@@ -9,7 +9,8 @@ pygame.font.init()
 
 res = (1200, 800)
 ser=serial.Serial('/dev/cu.usbserial-AL1RH4J0',9600,timeout=1)
-def worker():
+
+def threadFunc():
 
    global MESSAGE
    while True:
@@ -18,7 +19,7 @@ def worker():
        MESSAGE = msg.decode()
        time.sleep(0.5)
 
-t = Thread(target=worker)
+t = Thread(target=threadFunc)
 t.daemon = True
 t.start()
 screen = pygame.display.set_mode(res)
@@ -31,18 +32,20 @@ smallfont = pygame.font.SysFont('Arial',35)
 
 key=''
 
-while True:
+while 1:
     for event in pygame.event.get():
 
         if event.type == pygame.QUIT:
             pygame.quit()
         if event.type == pygame.KEYDOWN:
-            key=event.key
+                key=event.key
         if event.type == pygame.KEYUP:
-            key=''
+                key=''
     time.sleep(0.02)
     if key != '':
         ser.write(chr(key).encode())
+    if key == 119 or key == 97 or key == 115 or key == 100 or key == 101 or key == 113 or key == 117:
+        key = ''
 
 
     screen.fill((255, 255, 255))
