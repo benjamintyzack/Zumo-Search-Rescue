@@ -1,10 +1,31 @@
+/* Zumo Search and Rescue
+ This program performs a Search and Rescue using a Zumo32u4. It includes a manual mode and autonomous mode.
+ The Communication is done via XBee modules on serial port 9600
+
+ Manual Mode:
+ wasd - move Zumo around
+ b - stop to log a room
+ c - perform a room search
+ q & e - Perform a 90 degree turn either left or right
+ k - Emergency Stop
+ u - Perform a 180 degree turn
+ m - switch to automatic mode
+
+ Automatic mode:
+ The Zumo will navigate the corridor by itself using the line sensors to detect the corridor walls.
+ Each time it gets to a dead end it will ask the user what action to perform.
+ For a corner or T Junction it will ask which direction to turn and at a end of the corridor it
+ will ask to perform a U Turn
+ */
+
+
+// External Libraries
 #include <Zumo32U4Motors.h>
 #include <Zumo32U4LineSensors.h>
 #include <Zumo32U4ProximitySensors.h>
 #include <Zumo32U4Buzzer.h>
 #include <Zumo32U4Encoders.h>
 //Serial1 communicates over XBee
-//Serial communicates over USB cable
 Zumo32U4Motors motors;
 Zumo32U4LineSensors sensors;
 Zumo32U4Buzzer buzzer;
@@ -27,24 +48,24 @@ int endCounter;
 int calibrateData[3];
 int encodersCountLeft;
 int encodersCountRight;
-String foundRooms[50];
+String foundRooms[15];
 String roomDirection;
-boolean enableMessages = true;
+boolean enableMessages = true; // Boolean for whether room searching is enabled
 int robotStatus;
 int incomingByte; // for incoming serial data
 void setup() {
-  // put your setup code here, to run once:
+  // Serial1 takes in the port number 9600 so it can listen for incoming messages
   Serial1.begin(9600);
   incomingByte = Serial1.read();
 
   calibrateRobot();
-
+  // Robot starts in manual mode and can be switched at anytime
   robotStatus = 0;
   Serial1.println("Manual Mode Active, Press m to activate Auto mode");
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  // Switch case used to what controls to perform for which robot status
   switch (robotStatus) {
     case 0:
       manualControl();
@@ -57,13 +78,14 @@ void loop() {
 
 void calibrateRobot() {
 
+  // Initialise the line sensors, the proximity sensors and encoders
   sensors.initThreeSensors();
   delay(100);
   proxSensors.initFrontSensor();
   delay(100);
   encoders.init();
-    // Wait 1 second and then begin automatic sensor calibration
-  // by rotating in place to sweep the sensors over the line
+  // Wait 1 second and then begin automatic sensor calibration
+  // Zumo will rotate in place to calibrate sensors
   delay(1000);
   for(uint16_t i = 0; i < 120; i++)
   {
@@ -78,7 +100,7 @@ void calibrateRobot() {
 
     sensors.calibrate();
   }
-
+  // The maximum values detected by the line sensors are stored in an array
   for(int i= 0; i < NUM_SENSORS; i++) {
     calibrateData[i] = sensors.calibratedMaximumOn[i];
   }
@@ -89,6 +111,7 @@ void calibrateRobot() {
 
 void manualControl() {
 
+  // Basic manual controls for the Zumo, whatever the incomingByte is checked and the relevant action is performed
   incomingByte = Serial1.read();
 
   if(incomingByte == 'w') {
@@ -156,7 +179,14 @@ void manualControl() {
     robotStatus = 1;
   }
 }
-
+/* 
+Autonomous Mode: 
+The Zumo will navigate by itself down the corridor
+If either the right or left line sensor detects a black line it will adjust its course to
+stay within the lines
+If both the right and left sensor detect a black line or the middle sensor detects a black line then
+it will stop and ask the user what task to perform
+*/
 void autonomous() {
   incomingByte = Serial1.read();
 
@@ -165,6 +195,7 @@ void autonomous() {
     logRoom();
     searchRoom();
   }
+  // when the Zumo has reached the first end of the corridor it will wait for the user to press 'p' before being able to do a room search again
   else if (incomingByte == 'p') {
     enableMessages = true;
     Serial1.println("T Junctions passed, Room search enabled");
@@ -175,19 +206,19 @@ void autonomous() {
     robotStatus = 0;
     Serial1.println("Robot returned to manual mode");
   }
-  //if left and right sensor get a black border reading then...
-  else if(((lineSensorValues[2] > calibrateData[2] + 100) && (lineSensorValues[0] > calibrateData[0] + 100) || (lineSensorValues[1] > calibrateData[1] + 100))){ //if center sensor detects black line |sensor 1
+  //if left and right sensor detects a black line or if the centre sensor detects a black line
+  else if(((lineSensorValues[2] > calibrateData[2] + 100) && (lineSensorValues[0] > calibrateData[0] + 100) || (lineSensorValues[1] > calibrateData[1] + 100))){
     motors.setSpeeds(0,0);
     endCounter++;
+    // Has reached a corner, T junction or end of hallway
     junction();
   } 
-  //if left sesnor gets a black reading...
-  else if(lineSensorValues[0] > calibrateData[0] + 100){ //left sensor detects line | sensor 0
+  //if left sensor detects a black line
+  else if(lineSensorValues[0] > calibrateData[0] + 100){
     //go right for 1/4 second
     motors.setSpeeds(TURN_SPEED, 0);
-  //if right sensor gets a black boarder reading...
-  }else if(lineSensorValues[2] > calibrateData[2] + 100){ //if right sensor detects black line| sensor 2
-    //go ;left for 1/4 second
+  //if right sensor detects a black line
+  }else if(lineSensorValues[2] > calibrateData[2] + 100){
     motors.setSpeeds(0,  TURN_SPEED);
   }
   else {
@@ -200,6 +231,7 @@ void searchRoom() {
   delay(200);
   motors.setSpeeds(STOP_SPEED, STOP_SPEED);
 
+  // Similiar to the calibration at the start the Zumo will turn from side to side while firing off the proximity sensors
   for(uint16_t i = 0; i < 60; i++)
   {
     if (i > 15 && i <= 45)
@@ -214,6 +246,7 @@ void searchRoom() {
     }
   }
   motors.setSpeeds(STOP_SPEED, STOP_SPEED);
+  // Checking whether the proximity sensor values are above 3. If so then there is a person in the room
   if(proxSensors.countsLeftWithLeftLeds() > 3 || proxSensors.countsFrontWithLeftLeds() > 3 || proxSensors.countsFrontWithRightLeds() > 3 || proxSensors.countsRightWithRightLeds() > 3) {
     Serial1.println("Person found in room ");
     Serial1.println(roomDirection[roomNumber]);
@@ -235,11 +268,13 @@ void searchRoom() {
 }
 
 void turnRight90() {
+  // Reset the encoder values to 0 and the actual encoders
   encodersCountRight = 0;
   encodersCountLeft = 0;
   encoders.getCountsAndResetRight();
   encoders.getCountsAndResetLeft();
   motors.setSpeeds(TURN_SPEED, -TURN_SPEED);
+  // While the value of the encoders is not -700 keep the Zumo turning and read in the encoder value
   while ((encodersCountRight > -700)) {
     encodersCountRight = encoders.getCountsRight();
   }
@@ -248,11 +283,13 @@ void turnRight90() {
 }
 
 void turnLeft90() {
+  // Reset the encoder values to 0 and the actual encoders
   encodersCountLeft = 0;
   encodersCountRight = 0;
   encoders.getCountsAndResetRight();
   encoders.getCountsAndResetLeft();
   motors.setSpeeds(-TURN_SPEED, TURN_SPEED);
+  // While the value of the encoders is not -700 keep the Zumo turning and read in the encoder value
   while ((encodersCountLeft > -700)) {
     encodersCountLeft = encoders.getCountsLeft();
   }
@@ -265,7 +302,8 @@ void logRoom() {
   Serial1.println("Stopping for Room");
   Serial1.println("Indicate which direction the room is, press A for left or D for right");
   motors.setSpeeds(STOP_SPEED, STOP_SPEED);
-    
+  
+  // While the input doesn't equal left or right just keep reading in the input but don't do anything
   while ((incomingByte != 'a') && (incomingByte != 'd'))
   {
     incomingByte = (char) Serial1.read();
@@ -288,7 +326,7 @@ void logRoom() {
     foundRooms[roomNumber] = "right";
   }
 
-
+  // Print out the room number and the direction of the room, had to print it out like this as there was issues in printing it in one line
   Serial1.print("Room ");
   Serial1.print(roomNumber);
   Serial1.print(" is on the ");
@@ -296,9 +334,12 @@ void logRoom() {
   Serial1.println(" ");
 }
 
+// Function for when the Zumo hits a dead end. Will ask what task to perform based of what the end counter equals to 
 void junction() {
   incomingByte = Serial1.read();
 
+
+  // if the end count less then two then the Zumo is at either a corner or the T Junction and will ask to turn left or right
   if(endCounter <= 2) {
     Serial1.println("Press A to turn left or D to turn right");
 
@@ -320,19 +361,22 @@ void junction() {
     //Go back to auto mode
     robotStatus = 1;
   }
+  // if the end count is at 3 it's reached the first end of the corridor and asks to perform a U-turn
   else if (endCounter == 3) {
     Serial1.println("Press U to complete a 180 degree turn");
     while ((incomingByte != 'u'))
     {
       incomingByte = (char) Serial1.read();
     }
-    Serial.println("Starting 180 degree turn...");
+    Serial1.println("Starting 180 degree turn...");
     turnLeft90();
     turnLeft90();
     robotStatus = 1;
     // Ensure that the zumo can no longer search
     enableMessages = false;
+    Serial1.println("Press P when passed the T Junction to re-enable room searching");
   }
+  // When end count is 4 the Zumo has reached the end of the journey
   else if (endCounter == 4) {
     Serial1.println("End of Hallway.");
     robotStatus = 0;
