@@ -228,13 +228,13 @@ void autonomous() {
 
 void searchRoom() {
   motors.setSpeeds(FORWARD_SPEED, FORWARD_SPEED);
-  delay(200);
+  delay(650);
   motors.setSpeeds(STOP_SPEED, STOP_SPEED);
 
   // Similiar to the calibration at the start the Zumo will turn from side to side while firing off the proximity sensors
-  for(uint16_t i = 0; i < 60; i++)
+  for(uint16_t i = 0; i < 120; i++)
   {
-    if (i > 15 && i <= 45)
+    if (i > 30 && i <= 90)
     {
       motors.setSpeeds(-TURN_SPEED, TURN_SPEED);
       proxSensors.read();
@@ -257,7 +257,7 @@ void searchRoom() {
     Serial1.println("No Person found");
   }
   motors.setSpeeds(-BACKWARD_SPEED, -BACKWARD_SPEED);
-  delay(200);
+  delay(650);
   if(foundRooms[roomNumber] == "left") {
     turnRight90();
   }
